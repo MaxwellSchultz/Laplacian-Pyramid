@@ -151,6 +151,10 @@ def create_hybrid_image(img1, img2, sigma1, size1, high_low1, sigma2, size2,
     hybrid_img = (img1 + img2)
     return (hybrid_img * 255).clip(0, 255).astype(np.uint8)
 
+# seperable filter borrowed from Scott Wehrwein's lecture code
+def separable_filter(img, kernel1d):
+    return cross_correlation_2d(cross_correlation_2d(img, kernel1d), kernel1d.T)
+
 def construct_laplacian(img, levels):
     """ Construct a Laplacian pyramid for the image img with `levels` levels.
     Returns a python list; the first `levels`-1 elements are high-pass images
@@ -162,8 +166,28 @@ def construct_laplacian(img, levels):
     h, w = img.shape[:2]
     f = 2**(levels-1) # power of two that the dimensions must be divisible by
     assert h % f == 0 and w % f == 0
-
-    raise Exception("TODO 2.1 in filtering.py not implemented")
+    
+    blur_1d = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625]).reshape((1, 5))
+    gau_pyr = []
+    gau_pyr.append(img)
+    
+    for currLev in range(1,levels):
+        blurImg = separable_filter(gau_pyr[currLev-1], blur_1d)
+        blurImg = blurImg[::2,::2,:]
+        gau_pyr.append(blurImg)
+        
+    lap_pyr = []
+    lap_pyr.append(gau_pyr[levels-1])
+    
+    for currLev in range(levels-1,0,-1):
+        currImg = gau_pyr[currLev]
+        H, W, = currImg.shape[:2]
+        upImg = np.zeros((2*H, 2*W, 3), dtype=img.dtype)    # nearest neighbor code from lecture code
+        for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):   # created by scott wehrwein
+                upImg[io::2, jo::2, :] = currImg
+        lap_pyr.insert(0, gau_pyr[currLev-1] - upImg)
+        
+    return lap_pyr
 
 def reconstruct_laplacian(pyr, weights=None):
     """ Given a laplacian pyramid, reconstruct the original image.
@@ -174,5 +198,33 @@ def reconstruct_laplacian(pyr, weights=None):
         corresponding value in the weights list while adding it into the 
         reconstruction.
     """
-    raise Exception("TODO 2.2 in filtering.py not implemented")
+    
+    levels = len(pyr)
+    
+    finalH, finalW, = pyr[levels-1].shape[:2]   
+    finalImg = np.zeros((finalH, finalW), dtype=pyr[0].dtype)
+    
+    if weights is None:
+        for currLev in range(levels-1,0,-1):
+            currImg = pyr[currLev]
+            H, W, = currImg.shape[:2]
+            upImg = np.zeros((2*H, 2*W, 3), dtype=pyr[0].dtype)
+            for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):
+                    upImg[io::2, jo::2, :] = currImg
+            pyr[currLev-1] += upImg 
+    else:
+        for currLev in range(levels-1,0,-1):
+            currImg = pyr[currLev]
+            H, W, = currImg.shape[:2]
+            upImg = np.zeros((2*H, 2*W, 3), dtype=pyr[0].dtype)
+            for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):
+                    upImg[io::2, jo::2, :] = currImg
+            if (currLev > 1):
+                pyr[currLev-1] += (upImg * weights[currLev])
+            else:
+                pyr[currLev-1] * weights[0]
+                pyr[currLev-1] += (upImg * weights[currLev])
+                
+    return pyr[0]
+            
 
