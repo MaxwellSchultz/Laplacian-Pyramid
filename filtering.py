@@ -1,4 +1,5 @@
 import cv2
+import copy
 import numpy as np
 
 def cross_correlation_2d(img, kernel):
@@ -199,32 +200,36 @@ def reconstruct_laplacian(pyr, weights=None):
         reconstruction.
     """
     
-    levels = len(pyr)
+    copy_pyr = copy.deepcopy(pyr)
     
-    finalH, finalW, = pyr[levels-1].shape[:2]   
-    finalImg = np.zeros((finalH, finalW), dtype=pyr[0].dtype)
+    levels = len(copy_pyr)
+    
+    finalH, finalW, = copy_pyr[levels-1].shape[:2]   
+    finalImg = np.zeros((finalH, finalW), dtype=copy_pyr[0].dtype)
     
     if weights is None:
         for currLev in range(levels-1,0,-1):
-            currImg = pyr[currLev]
+            currImg = copy_pyr[currLev]
             H, W, = currImg.shape[:2]
-            upImg = np.zeros((2*H, 2*W, 3), dtype=pyr[0].dtype)
+            upImg = np.zeros((2*H, 2*W, 3), dtype=copy_pyr[0].dtype)
             for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):
                     upImg[io::2, jo::2, :] = currImg
-            pyr[currLev-1] += upImg 
+            copy_pyr[currLev-1] += upImg 
     else:
+        for lev in range(levels):
+            print("level " + str(lev))
+            print("weight " + str(weights[lev]))
+            print(copy_pyr[lev][1,1,:])
+            copy_pyr[lev] *= weights[lev]
+            print(copy_pyr[lev][1,1,:])
         for currLev in range(levels-1,0,-1):
-            currImg = pyr[currLev]
+            currImg = copy_pyr[currLev]
             H, W, = currImg.shape[:2]
-            upImg = np.zeros((2*H, 2*W, 3), dtype=pyr[0].dtype)
+            upImg = np.zeros((2*H, 2*W, 3), dtype=copy_pyr[0].dtype)
             for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):
                     upImg[io::2, jo::2, :] = currImg
-            if (currLev > 1):
-                pyr[currLev-1] += (upImg * weights[currLev])
-            else:
-                pyr[currLev-1] * weights[0]
-                pyr[currLev-1] += (upImg * weights[currLev])
+            copy_pyr[currLev-1] += upImg
                 
-    return pyr[0]
+    return copy_pyr[0]
             
 
