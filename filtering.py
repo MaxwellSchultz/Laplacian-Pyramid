@@ -172,6 +172,7 @@ def construct_laplacian(img, levels):
     gau_pyr = []
     gau_pyr.append(img)
     
+    # generate gaussian pyramid
     for currLev in range(1,levels):
         blurImg = separable_filter(gau_pyr[currLev-1], blur_1d)
         blurImg = blurImg[::2,::2,:]
@@ -180,6 +181,7 @@ def construct_laplacian(img, levels):
     lap_pyr = []
     lap_pyr.append(gau_pyr[levels-1])
     
+    # generate laplacian pyramid from gaussian pyramid
     for currLev in range(levels-1,0,-1):
         currImg = gau_pyr[currLev]
         H, W, = currImg.shape[:2]
@@ -200,6 +202,7 @@ def reconstruct_laplacian(pyr, weights=None):
         reconstruction.
     """
     
+    # create copy as to not damage underlying laplacian representation
     copy_pyr = copy.deepcopy(pyr)
     
     levels = len(copy_pyr)
@@ -212,16 +215,14 @@ def reconstruct_laplacian(pyr, weights=None):
             currImg = copy_pyr[currLev]
             H, W, = currImg.shape[:2]
             upImg = np.zeros((2*H, 2*W, 3), dtype=copy_pyr[0].dtype)
-            for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):
-                    upImg[io::2, jo::2, :] = currImg
+            for (io, jo) in ((0, 0), (0, 1), (1, 0), (1, 1)):   # nearest neighbor code from lecture code
+                    upImg[io::2, jo::2, :] = currImg            # created by scott wehrwein
             copy_pyr[currLev-1] += upImg 
     else:
+        # multiple layers by weights
         for lev in range(levels):
-            print("level " + str(lev))
-            print("weight " + str(weights[lev]))
-            print(copy_pyr[lev][1,1,:])
             copy_pyr[lev] *= weights[lev]
-            print(copy_pyr[lev][1,1,:])
+        # reconstruct image
         for currLev in range(levels-1,0,-1):
             currImg = copy_pyr[currLev]
             H, W, = currImg.shape[:2]
